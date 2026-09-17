@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku — พิมพ์เขียวตัวเลข</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0d1526;
+    --bg-grid: #0a0f1d;
+    --panel: #131d33;
+    --panel-2: #182444;
+    --line-minor: rgba(178, 199, 235, 0.14);
+    --line-major: #4c6fff;
+    --paper: #eef1f8;
+    --ink-given: #dfe6f5;
+    --ink-user: #5eead4;
+    --ink-user-dim: rgba(94, 234, 212, 0.55);
+    --accent: #5eead4;
+    --accent-soft: rgba(94, 234, 212, 0.14);
+    --error: #fb7185;
+    --error-soft: rgba(251, 113, 133, 0.16);
+    --muted: #7c8bb0;
+    --sel: rgba(94, 234, 212, 0.16);
+    --peer: rgba(140, 165, 226, 0.09);
+    --same-num: rgba(94, 234, 212, 0.10);
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--paper);
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body{
+    min-height: 100vh;
+    display:flex;
+    justify-content:center;
+    padding: 28px 14px 40px;
+    background-image:
+      linear-gradient(var(--line-minor) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-minor) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: center top;
+  }
+  .app{
+    width: 100%;
+    max-width: 460px;
+    display:flex;
+    flex-direction:column;
+    gap: 18px;
+  }
+  .hidden{ display:none !important; }
+
+  /* header */
+  .head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom: 1px solid var(--line-minor);
+    padding-bottom: 12px;
+    gap: 10px;
+  }
+  .head h1{
+    margin:0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--paper);
+  }
+  .head h1 span{ color: var(--accent); }
+  .head .sub{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .player-chip{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .player-chip b{ color: var(--paper); font-weight:600; }
+  .icon-btn{
+    background: var(--panel);
+    border: 1px solid var(--line-minor);
+    color: var(--muted);
+    border-radius: 7px;
+    width: 30px; height: 30px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .icon-btn svg{ width:15px; height:15px; }
+  .icon-btn:active{ transform: translateY(1px); }
+
+  /* loading */
+  .loading-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align:center;
+    padding: 30px 0;
+  }
+
+  /* ---------- MAP VIEW ---------- */
+  .map-intro{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    border-left: 2px solid var(--line-major);
+    padding-left: 10px;
+  }
+  .map-intro b{ color: var(--accent); }
+
+  .stage-list{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+  }
+  .stage-card{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    background: var(--panel);
+    border: 1px solid var(--line-minor);
+    border-radius: 10px;
+    padding: 14px;
+    cursor:pointer;
+    transition: border-color .15s ease, background .15s ease;
+    text-align:left;
+    position:relative;
+    overflow:hidden;
+    width:100%;
+    font-family: inherit;
+  }
+  .stage-card:not(.locked):active{ transform: translateY(1px); }
+  .stage-card .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--muted);
+    min-width: 34px;
+  }
+  .stage-card .info{ flex:1; min-width:0; }
+  .stage-card .info .name{
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--paper);
+  }
+  .stage-card .info .diff{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .stage-card .badge{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    white-space:nowrap;
+  }
+  .stage-card.unlocked{ border-color: var(--line-minor); }
+  .stage-card.unlocked .badge{ background: var(--accent-soft); color: var(--accent); }
+  .stage-card.passed{ border-color: var(--accent); }
+  .stage-card.passed .num{ color: var(--accent); }
+  .stage-card.passed .badge{ background: var(--accent); color: #0a1220; }
+  .stage-card.locked{ opacity: 0.45; cursor: default; }
+  .stage-card.locked .badge{ background: rgba(255,255,255,0.06); color: var(--muted); }
+  .stage-card .record{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .map-footer{
+    display:flex;
+    gap: 8px;
+  }
+  .map-footer button{
+    flex:1;
+  }
+
+  /* ---------- GAME VIEW ---------- */
+  .game-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 10px;
+  }
+  .back-btn{
+    display:flex;
+    align-items:center;
+    gap: 5px;
+    background: var(--panel);
+    border: 1px solid var(--line-minor);
+    color: var(--muted);
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    cursor:pointer;
+  }
+  .back-btn svg{ width:13px; height:13px; }
+  .stage-title{ text-align:right; }
+  .stage-title .name{ font-size: 13px; font-weight:600; color: var(--paper); }
+  .stage-title .diff{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .progress-dots{
+    display:flex;
+    justify-content:center;
+    gap: 8px;
+  }
+  .progress-dots .dot{
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--line-minor);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--panel);
+  }
+  .progress-dots .dot.current{ border-color: var(--accent); color: var(--accent); }
+  .progress-dots .dot.win{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .progress-dots .dot.loss{ background: var(--error-soft); border-color: var(--error); color: var(--error); }
+
+  .status{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .status .metric{ display:flex; gap:6px; align-items:baseline; }
+  .status .metric b{
+    color: var(--paper);
+    font-size: 15px;
+    font-weight: 600;
+    min-width: 2.4em;
+    display:inline-block;
+  }
+  .status .metric.err b{ color: var(--error); }
+
+  .board-wrap{
+    background: var(--bg-grid);
+    border: 1px solid var(--line-minor);
+    border-radius: 10px;
+    padding: 10px;
+    position:relative;
+  }
+  .board{
+    display:grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    width:100%;
+    aspect-ratio: 1 / 1;
+    background: var(--line-minor);
+    gap:1px;
+    border: 1.5px solid var(--line-major);
+    border-radius: 4px;
+    overflow:hidden;
+  }
+  .cell{
+    background: var(--bg-grid);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    cursor:pointer;
+    user-select:none;
+  }
+  .cell.b-right{ border-right: 1.5px solid var(--line-major); }
+  .cell.b-bottom{ border-bottom: 1.5px solid var(--line-major); }
+
+  .cell .val{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(16px, 4.6vw, 22px);
+    font-weight: 500;
+    color: var(--ink-user);
+  }
+  .cell.given .val{ color: var(--ink-given); font-weight: 600; }
+  .cell.error .val{ color: var(--error); }
+
+  .cell.selected{ background: var(--sel); }
+  .cell.peer{ background: var(--peer); }
+  .cell.same-num{ background: var(--same-num); }
+  .cell.error{ background: var(--error-soft); }
+  .cell.hint-flash{ animation: flash 0.6s ease; }
+  @keyframes flash{
+    0%{ background: var(--accent-soft); }
+    100%{ background: transparent; }
+  }
+
+  .notes{
+    position:absolute; inset:0;
+    display:grid;
+    grid-template-columns: repeat(3,1fr);
+    grid-template-rows: repeat(3,1fr);
+    padding: 2px;
+  }
+  .notes span{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(7px, 1.9vw, 9px);
+    color: var(--ink-user-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .controls{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+  }
+  .toolrow{ display:flex; gap: 8px; }
+  .toolbtn{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    background: var(--panel);
+    border: 1px solid var(--line-minor);
+    color: var(--muted);
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 6px;
+    border-radius: 8px;
+    cursor:pointer;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .toolbtn:active{ transform: translateY(1px); }
+  .toolbtn.on{
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .toolbtn svg{ width:15px; height:15px; }
+
+  .numpad{
+    display:grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+  }
+  .numpad button{
+    aspect-ratio: 1/1;
+    background: var(--panel-2);
+    border: 1px solid var(--line-minor);
+    border-radius: 7px;
+    color: var(--paper);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+  }
+  .numpad button .cnt{ font-size: 8px; color: var(--muted); margin-top: 2px; }
+  .numpad button:disabled{ opacity: 0.28; cursor:default; }
+  .numpad button:active{ background: var(--accent-soft); }
+
+  /* ---------- STATS VIEW ---------- */
+  .stats-section{
+    background: var(--panel);
+    border: 1px solid var(--line-minor);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .stats-section h3{
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: var(--paper);
+    font-weight:600;
+  }
+  .stats-cards{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stats-cards .card{
+    background: var(--panel-2);
+    border: 1px solid var(--line-minor);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .stats-cards .card .n{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stats-cards .card .l{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .trend-box{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .trend-box .pill{
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .trend-box .pill.up{ background: var(--accent-soft); color: var(--accent); }
+  .trend-box .pill.down{ background: var(--error-soft); color: var(--error); }
+  .trend-box .pill.flat{ background: rgba(255,255,255,0.06); color: var(--muted); }
+
+  .timeline{
+    display:flex;
+    flex-wrap:wrap;
+    gap: 5px;
+  }
+  .timeline .sq{
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-minor);
+  }
+  .timeline .sq.win{ background: var(--accent-soft); border-color: var(--accent); }
+  .timeline .sq.loss{ background: var(--error-soft); border-color: var(--error); }
+
+  .stage-table{ width:100%; border-collapse: collapse; }
+  .stage-table th, .stage-table td{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    text-align:left;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--line-minor);
+    color: var(--muted);
+  }
+  .stage-table th{ color: var(--paper); font-weight:600; }
+  .stage-table td.status-passed{ color: var(--accent); }
+  .stage-table td.status-locked{ color: var(--muted); opacity:0.6; }
+
+  .empty-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align:center;
+    padding: 14px 0;
+  }
+
+  .disclosure{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    background: rgba(255,255,255,0.03);
+    border: 1px dashed var(--line-minor);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .lb-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line-minor);
+    color: var(--muted);
+  }
+  .lb-row:last-child{ border-bottom:none; }
+  .lb-row .lb-name{ color: var(--paper); font-weight:600; }
+  .lb-row.me .lb-name{ color: var(--accent); }
+
+  .ghost-btn{
+    background: transparent;
+    border: 1px solid var(--line-minor);
+    color: var(--muted);
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor:pointer;
+    width:100%;
+  }
+  .danger-btn{
+    background: transparent;
+    border: 1px solid var(--error);
+    color: var(--error);
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor:pointer;
+    width:100%;
+  }
+
+  /* overlay (shared for board result / stage result / name prompt) */
+  .overlay{
+    position:fixed; inset:0;
+    background: rgba(10,15,29,0.86);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index: 20;
+    padding: 20px;
+  }
+  .overlay.show{ display:flex; }
+  .win-card{
+    background: var(--panel);
+    border: 1px solid var(--line-major);
+    border-radius: 12px;
+    padding: 28px 24px;
+    text-align:center;
+    max-width: 320px;
+    width:100%;
+  }
+  .win-card.loss{ border-color: var(--error); }
+  .win-card .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .win-card.loss .tag{ color: var(--error); }
+  .win-card h2{ margin: 8px 0 4px; font-size: 24px; }
+  .win-card p{
+    color: var(--muted);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+  .win-card .stage-dots{
+    display:flex;
+    justify-content:center;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .win-card .stage-dots span{
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    border: 1px solid var(--line-minor);
+  }
+  .win-card .stage-dots span.w{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .win-card .stage-dots span.l{ background: var(--error-soft); border-color: var(--error); color: var(--error); }
+  .win-card input[type=text]{
+    width:100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-minor);
+    color: var(--paper);
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    outline:none;
+  }
+  .win-card input[type=text]:focus{ border-color: var(--accent); }
+  .win-card button{
+    width:100%;
+    background: var(--accent);
+    color: #0a1220;
+    border:none;
+    padding: 12px;
+    border-radius: 8px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor:pointer;
+    margin-top: 8px;
+  }
+  .win-card button.ghost{
+    background: transparent;
+    border: 1px solid var(--line-minor);
+    color: var(--muted);
+  }
+
+  .help-card{
+    max-width: 380px;
+    max-height: 82vh;
+    display:flex;
+    flex-direction:column;
+    text-align:left;
+    position:relative;
+  }
+  .help-card .tag, .help-card h2{ text-align:left; }
+  .help-close{
+    position:absolute;
+    top: 14px; right: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-minor);
+    color: var(--muted);
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    cursor:pointer;
+    font-size: 13px;
+    line-height:1;
+  }
+  .help-body{
+    overflow-y: auto;
+    padding-right: 4px;
+    margin: 6px 0 4px;
+  }
+  .help-body h4{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin: 16px 0 8px;
+  }
+  .help-body h4:first-child{ margin-top: 0; }
+  .help-body ul{
+    margin: 0;
+    padding-left: 18px;
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+  }
+  .help-body li{
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .help-body li b{ color: var(--paper); font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="head">
+    <h1>SU<span>DO</span>KU</h1>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div class="player-chip" id="playerChip"></div>
+      <button class="icon-btn" id="helpBtn" title="วิธีเล่น / กติกา">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><path d="M12 17h.01"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== LOADING ===== -->
+  <div id="loadingView" class="loading-line">กำลังโหลดข้อมูล...</div>
+
+  <!-- ===== MAP VIEW ===== -->
+  <div id="mapView" class="hidden">
+    <div class="map-intro" style="margin-bottom:14px;">
+      แต่ละด่านมี <b>5 กระดาน</b> — ต้องชนะอย่างน้อย <b>4 ใน 5</b> กระดาน จึงจะปลดล็อกด่านถัดไป
+    </div>
+    <div class="stage-list" id="stageList"></div>
+    <div class="map-footer" style="margin-top:14px;">
+      <button class="ghost-btn" id="openStatsBtn">📊 สถิติของฉัน</button>
+    </div>
+  </div>
+
+  <!-- ===== GAME VIEW ===== -->
+  <div id="gameView" class="hidden">
+    <div class="game-bar">
+      <button class="back-btn" id="backBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        แผนที่ด่าน
+      </button>
+      <div class="stage-title">
+        <div class="name" id="stageTitleName">—</div>
+        <div class="diff" id="stageTitleDiff">—</div>
+      </div>
+    </div>
+
+    <div class="progress-dots" id="progressDots"></div>
+
+    <div class="status">
+      <div class="metric">เวลา <b id="timer">00:00</b></div>
+      <div class="metric err">พลาด <b id="mistakes">0/3</b></div>
+      <div class="metric">เหลือ <b id="remaining">0</b></div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="controls">
+      <div class="toolrow">
+        <button class="toolbtn" id="undoBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5v0A5.5 5.5 0 0 1 14.5 20H11"/></svg>
+          ย้อนกลับ
+        </button>
+        <button class="toolbtn" id="notesBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          จด
+        </button>
+        <button class="toolbtn" id="hintBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3v.5h6v-.5c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
+          คำใบ้
+        </button>
+      </div>
+      <div class="numpad" id="numpad"></div>
+    </div>
+  </div>
+
+  <!-- ===== STATS VIEW ===== -->
+  <div id="statsView" class="hidden">
+    <div class="game-bar" style="margin-bottom:14px;">
+      <button class="back-btn" id="statsBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        แผนที่ด่าน
+      </button>
+      <div class="stage-title">
+        <div class="name">สถิติของฉัน</div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="stats-section">
+        <h3>ภาพรวม</h3>
+        <div class="stats-cards" id="statsCards"></div>
+      </div>
+
+      <div class="stats-section">
+        <h3>แนวโน้มพัฒนาการ</h3>
+        <div id="trendBox"></div>
+      </div>
+
+      <div class="stats-section">
+        <h3>ประวัติการเล่นล่าสุด</h3>
+        <div class="timeline" id="timelineBox"></div>
+      </div>
+
+      <div class="stats-section">
+        <h3>ผลแยกตามด่าน</h3>
+        <table class="stage-table" id="stageTable"></table>
+      </div>
+
+      <div class="stats-section">
+        <h3>อันดับผู้เล่น</h3>
+        <div class="disclosure">ชื่อและด่านที่ไปได้ไกลที่สุดของคุณจะถูกแชร์ให้ผู้เล่นคนอื่นที่เปิดเกมนี้เห็นด้วย</div>
+        <div id="lbBox" style="margin-top:10px;">
+          <button class="ghost-btn" id="loadLbBtn">ดูอันดับผู้เล่นทั้งหมด</button>
+        </div>
+      </div>
+
+      <button class="danger-btn" id="resetDataBtn">เปลี่ยนผู้เล่น</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="win-card" id="overlayCard">
+    <div class="tag" id="overlayTag">คลี่คลายแล้ว</div>
+    <h2 id="overlayTitle">เก่งมาก!</h2>
+    <p id="overlayStats">เวลา 00:00 · พลาด 0 ครั้ง</p>
+    <div class="stage-dots hidden" id="overlayDots"></div>
+    <button id="overlayPrimary">ถัดไป</button>
+    <button class="ghost hidden" id="overlaySecondary">กลับแผนที่ด่าน</button>
+  </div>
+</div>
+
+<div class="overlay" id="nameModal">
+  <div class="win-card">
+    <div class="tag">ยินดีต้อนรับ</div>
+    <h2>ตั้งชื่อผู้เล่น</h2>
+    <p>ใช้แยกสถิติและความคืบหน้าของคุณ</p>
+    <input type="text" id="nameInput" maxlength="24" placeholder="ชื่อของคุณ">
+    <button id="nameSubmit">เริ่มเล่น</button>
+  </div>
+</div>
+
+<div class="overlay" id="helpModal">
+  <div class="win-card help-card">
+    <button class="help-close" id="helpCloseX" aria-label="ปิด">✕</button>
+    <div class="tag">คู่มือ</div>
+    <h2>วิธีเล่น &amp; กติกา</h2>
+
+    <div class="help-body">
+      <h4>กติกาซูโดกุพื้นฐาน</h4>
+      <ul>
+        <li>เติมเลข 1-9 ลงในตาราง 9×9</li>
+        <li>แต่ละ <b>แถว</b> ต้องมีเลข 1-9 ครบ ห้ามซ้ำ</li>
+        <li>แต่ละ <b>คอลัมน์</b> ต้องมีเลข 1-9 ครบ ห้ามซ้ำ</li>
+        <li>แต่ละ <b>บล็อก 3×3</b> ต้องมีเลข 1-9 ครบ ห้ามซ้ำ</li>
+      </ul>
+
+      <h4>ระบบด่าน</h4>
+      <ul>
+        <li>แต่ละด่านมี <b>5 กระดาน</b> เล่นเรียงกันไป</li>
+        <li>ต้องชนะอย่างน้อย <b>4 ใน 5 กระดาน</b> จึงจะปลดล็อกด่านถัดไป</li>
+        <li>ถ้าชนะไม่ถึง 4 กระดาน เล่นด่านเดิมซ้ำได้ ไม่จำกัดจำนวนครั้ง</li>
+        <li>ความยากจะเพิ่มขึ้นเรื่อยๆ ตามด่าน</li>
+      </ul>
+
+      <h4>กติกาการแพ้</h4>
+      <ul>
+        <li>ใส่เลขผิดครบ <b>3 ครั้ง</b> ในกระดานเดียวกัน = แพ้กระดานนั้นทันที</li>
+        <li>ระบบจะไปกระดานถัดไปให้อัตโนมัติ ไม่ต้องเริ่มด่านใหม่</li>
+      </ul>
+
+      <h4>วิธีเล่น</h4>
+      <ul>
+        <li>แตะ/คลิกช่องที่ต้องการ แล้วกดตัวเลขจากแป้นด้านล่าง</li>
+        <li>ใช้คีย์บอร์ดพิมพ์เลข 1-9 หรือลูกศรเลื่อนช่องได้เช่นกัน</li>
+        <li><b>ย้อนกลับ</b> — เผื่อกดผิด แก้ตัวหลังสุดได้</li>
+        <li><b>จด (Notes)</b> — เปิดโหมดนี้เพื่อจดตัวเลขที่เป็นไปได้หลายตัวในช่องเดียว ช่วยคิดวางแผน</li>
+        <li><b>คำใบ้</b> — เผยคำตอบของช่องที่เลือกไว้ 1 ช่อง (ใช้ได้เรื่อยๆ แต่ยิ่งใช้เยอะยิ่งไม่ท้าทาย)</li>
+        <li>ตัวเลขที่ให้มาตั้งแต่ต้น (สีอ่อน) แก้ไขไม่ได้ ส่วนตัวเลขที่ใส่เอง (สีฟ้า) แก้ไขได้ตลอด</li>
+      </ul>
+    </div>
+
+    <button id="helpCloseBtn">เข้าใจแล้ว เริ่มเล่นเลย</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Supabase backend ----------
+  // Replace these two values with the ones from your own Supabase
+  // project: Settings > API > "Project URL" and "anon public" key.
+  const SUPABASE_URL = 'https://qdljsrfhwakfpejkmutk.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGpzcmZod2FrZnBlamttdXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDExNTgsImV4cCI6MjEwNTExNzE1OH0.oaJ9NMHOtRAR_mQQA1TVGPJD2XshaLBUX_a05AQGiCQ';
+
+  const backendReady = SUPABASE_URL.indexOf('YOUR_SUPABASE_URL') === -1 &&
+                        typeof window.supabase !== 'undefined';
+  const sb = backendReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  function describeErr(e){
+    if(!e) return 'unknown error';
+    const parts = [e.message, e.details, e.hint, e.code].filter(Boolean);
+    return parts.length ? parts.join(' | ') : JSON.stringify(e);
+  }
+
+  async function dbInsert(table, row){
+    if(!sb) return false;
+    try{
+      const { error } = await sb.from(table).insert(row);
+      if(error){ console.error('supabase insert failed [' + table + ']: ' + describeErr(error)); return false; }
+      return true;
+    }catch(e){ console.error('supabase insert threw [' + table + ']: ' + describeErr(e)); return false; }
+  }
+  async function dbSelect(table, filters){
+    if(!sb) return [];
+    try{
+      let q = sb.from(table).select('*');
+      if(filters && filters.player_name) q = q.eq('player_name', filters.player_name);
+      q = q.order('created_at', { ascending: true });
+      const { data, error } = await q;
+      if(error){ console.error('supabase select failed [' + table + ']: ' + describeErr(error)); return []; }
+      return data || [];
+    }catch(e){ console.error('supabase select threw [' + table + ']: ' + describeErr(e)); return []; }
+  }
+
+  // ---------- Sudoku core ----------
+  function emptyGrid(){ return Array.from({length:9}, () => Array(9).fill(0)); }
+
+  function isValid(grid, r, c, v){
+    for(let i=0;i<9;i++){
+      if(grid[r][i]===v) return false;
+      if(grid[i][c]===v) return false;
+    }
+    const br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+    for(let i=0;i<3;i++) for(let j=0;j<3;j++){
+      if(grid[br+i][bc+j]===v) return false;
+    }
+    return true;
+  }
+
+  function shuffled(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  // Builds a random valid solved grid from a base pattern, then applies
+  // random band/stack/row/column/digit permutations and an occasional
+  // transpose. This avoids the bias of naive backtracking generators
+  // (which tend to produce very similar-looking grids run after run)
+  // and gives a genuinely different, unpredictable layout every call.
+  function shuffledBandOrder(){
+    let bands = shuffled([0,1,2]);
+    let order = [];
+    bands.forEach(b=>{
+      const rowsInBand = shuffled([0,1,2]).map(x=> b*3+x);
+      order = order.concat(rowsInBand);
+    });
+    return order;
+  }
+
+  function generateRandomSolvedGrid(){
+    const base = 3, side = 9;
+    const pattern = (r,c) => (base*(r%base) + Math.floor(r/base) + c) % side;
+
+    const rowsOrder = shuffledBandOrder();
+    const colsOrder = shuffledBandOrder();
+    const nums = shuffled([1,2,3,4,5,6,7,8,9]);
+
+    let grid = emptyGrid();
+    for(let r=0;r<9;r++){
+      for(let c=0;c<9;c++){
+        grid[r][c] = nums[pattern(rowsOrder[r], colsOrder[c])];
+      }
+    }
+
+    if(Math.random() < 0.5){
+      const t = emptyGrid();
+      for(let r=0;r<9;r++) for(let c=0;c<9;c++) t[c][r] = grid[r][c];
+      grid = t;
+    }
+
+    return grid;
+  }
+
+  function countSolutions(grid, limit){
+    let count = 0;
+    function solve(g){
+      if(count>=limit) return;
+      for(let r=0;r<9;r++){
+        for(let c=0;c<9;c++){
+          if(g[r][c]===0){
+            for(let v=1;v<=9;v++){
+              if(isValid(g,r,c,v)){
+                g[r][c]=v;
+                solve(g);
+                g[r][c]=0;
+                if(count>=limit) return;
+              }
+            }
+            return;
+          }
+        }
+      }
+      count++;
+    }
+    solve(grid.map(row=>row.slice()));
+    return count;
+  }
+
+  function generatePuzzle(clueCount){
+    const solution = generateRandomSolvedGrid();
+    const puzzle = solution.map(row=>row.slice());
+    const positions = shuffled(Array.from({length:81}, (_,i)=>i));
+    let filled = 81;
+    for(const pos of positions){
+      if(filled <= clueCount) break;
+      const r = Math.floor(pos/9), c = pos%9;
+      if(puzzle[r][c]===0) continue;
+      const backup = puzzle[r][c];
+      puzzle[r][c] = 0;
+      const solutions = countSolutions(puzzle, 2);
+      if(solutions !== 1){
+        puzzle[r][c] = backup;
+      } else {
+        filled--;
+      }
+    }
+    return { puzzle, solution };
+  }
+
+  // ---------- Campaign config ----------
+  const STAGES = [
+    { name: 'ด่าน 1', diff: 'ง่ายมาก', clues: 45 },
+    { name: 'ด่าน 2', diff: 'ง่าย', clues: 39 },
+    { name: 'ด่าน 3', diff: 'ปานกลาง', clues: 33 },
+    { name: 'ด่าน 4', diff: 'ปานกลาง-ยาก', clues: 29 },
+    { name: 'ด่าน 5', diff: 'ยาก', clues: 26 },
+    { name: 'ด่าน 6', diff: 'ยากมาก', clues: 22 },
+  ];
+  const BOARDS_PER_STAGE = 5;
+  const PASS_THRESHOLD = 4;
+  const MAX_MISTAKES = 3;
+
+  let stageStatus = STAGES.map((_,i)=> i===0 ? 'unlocked' : 'locked'); // locked | unlocked | passed
+  let bestWins = STAGES.map(()=> null);
+  let playLog = []; // {ts, stage, stageName, boardIndex, won, timeSec, mistakes}
+  let playerName = '';
+
+  // ---------- Runtime state ----------
+  let solution, given, board, notesData;
+  let selected = null;
+  let notesMode = false;
+  let mistakes = 0;
+  let timerSec = 0;
+  let timerHandle = null;
+  let history = [];
+
+  let curStage = 0;
+  let curBoardIdx = 0;
+  let results = [];
+
+  // ---------- DOM refs ----------
+  const loadingView = document.getElementById('loadingView');
+  const mapView = document.getElementById('mapView');
+  const gameView = document.getElementById('gameView');
+  const statsView = document.getElementById('statsView');
+  const playerChip = document.getElementById('playerChip');
+  const stageListEl = document.getElementById('stageList');
+  const boardEl = document.getElementById('board');
+  const numpadEl = document.getElementById('numpad');
+  const timerEl = document.getElementById('timer');
+  const mistakesEl = document.getElementById('mistakes');
+  const remainingEl = document.getElementById('remaining');
+  const progressDotsEl = document.getElementById('progressDots');
+  const stageTitleName = document.getElementById('stageTitleName');
+  const stageTitleDiff = document.getElementById('stageTitleDiff');
+
+  const overlayEl = document.getElementById('overlay');
+  const overlayCard = document.getElementById('overlayCard');
+  const overlayTag = document.getElementById('overlayTag');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayStats = document.getElementById('overlayStats');
+  const overlayDots = document.getElementById('overlayDots');
+  const overlayPrimary = document.getElementById('overlayPrimary');
+  const overlaySecondary = document.getElementById('overlaySecondary');
+
+  const nameModal = document.getElementById('nameModal');
+  const nameInput = document.getElementById('nameInput');
+  const helpModal = document.getElementById('helpModal');
+
+  function fmtTime(s){
+    const m = Math.floor(s/60).toString().padStart(2,'0');
+    const sec = (s%60).toString().padStart(2,'0');
+    return m+':'+sec;
+  }
+  function fmtDate(ts){
+    const d = new Date(ts);
+    return d.toLocaleDateString('th-TH', {day:'2-digit', month:'2-digit'}) + ' ' +
+           d.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'});
+  }
+
+  function startTimer(){
+    stopTimer();
+    timerSec = 0;
+    timerEl.textContent = fmtTime(0);
+    timerHandle = setInterval(()=>{
+      timerSec++;
+      timerEl.textContent = fmtTime(timerSec);
+    }, 1000);
+  }
+  function stopTimer(){
+    if(timerHandle) clearInterval(timerHandle);
+    timerHandle = null;
+  }
+
+  function renderPlayerChip(){
+    playerChip.innerHTML = '';
+    if(!playerName) return;
+    const span = document.createElement('span');
+    span.innerHTML = 'สวัสดี, <b>'+escapeHtml(playerName)+'</b>';
+    playerChip.appendChild(span);
+  }
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ---------- Persistence (Supabase) ----------
+  // board_log: one row per finished board (win or loss).
+  async function recordBoardResult(entry){
+    await dbInsert('board_log', {
+      player_name: playerName,
+      stage_index: entry.stage,
+      stage_name: entry.stageName,
+      board_index: entry.boardIndex,
+      won: entry.won,
+      time_sec: entry.timeSec,
+      mistakes: entry.mistakes
+    });
+  }
+  // stage_attempts: one row per finished stage (5-board) attempt.
+  async function recordStageAttempt(stageIndex, wins, passed){
+    await dbInsert('stage_attempts', {
+      player_name: playerName,
+      stage_index: stageIndex,
+      stage_name: STAGES[stageIndex].name,
+      wins: wins,
+      passed: passed
+    });
+  }
+  // Rebuild stageStatus / bestWins for this player from their stage_attempts history.
+  function deriveProgressFromAttempts(attempts){
+    const status = STAGES.map((_,i)=> i===0 ? 'unlocked' : 'locked');
+    const best = STAGES.map(()=> null);
+    attempts.forEach(a=>{
+      const i = a.stage_index;
+      if(i<0 || i>=STAGES.length) return;
+      best[i] = best[i]===null ? a.wins : Math.max(best[i], a.wins);
+      if(a.passed){
+        status[i] = 'passed';
+        if(i+1 < STAGES.length && status[i+1] === 'locked') status[i+1] = 'unlocked';
+      } else if(status[i] === 'locked'){
+        status[i] = 'unlocked';
+      }
+    });
+    return { status, best };
+  }
+
+  // ---------- Map view ----------
+  function renderMap(){
+    stageListEl.innerHTML = '';
+    STAGES.forEach((st, i)=>{
+      const status = stageStatus[i];
+      const card = document.createElement('button');
+      card.className = 'stage-card ' + status;
+      card.disabled = status === 'locked';
+
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = String(i+1).padStart(2,'0');
+
+      const info = document.createElement('div');
+      info.className = 'info';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = st.name;
+      const diff = document.createElement('div');
+      diff.className = 'diff';
+      diff.textContent = 'ความยาก: ' + st.diff;
+      info.appendChild(name);
+      info.appendChild(diff);
+      if(bestWins[i] !== null){
+        const rec = document.createElement('div');
+        rec.className = 'record';
+        rec.textContent = 'สถิติล่าสุด: ชนะ ' + bestWins[i] + '/' + BOARDS_PER_STAGE;
+        info.appendChild(rec);
+      }
+
+      const badge = document.createElement('div');
+      badge.className = 'badge';
+      badge.textContent = status === 'locked' ? 'ล็อก' : status === 'passed' ? 'ผ่านแล้ว' : 'เล่นได้';
+
+      card.appendChild(num);
+      card.appendChild(info);
+      card.appendChild(badge);
+
+      if(status !== 'locked'){
+        card.addEventListener('click', ()=> startStage(i));
+      }
+      stageListEl.appendChild(card);
+    });
+  }
+
+  function showLoading(){
+    loadingView.classList.remove('hidden');
+    mapView.classList.add('hidden');
+    gameView.classList.add('hidden');
+    statsView.classList.add('hidden');
+  }
+  function showMap(){
+    stopTimer();
+    overlayEl.classList.remove('show');
+    loadingView.classList.add('hidden');
+    gameView.classList.add('hidden');
+    statsView.classList.add('hidden');
+    mapView.classList.remove('hidden');
+    renderMap();
+  }
+  function showGame(){
+    loadingView.classList.add('hidden');
+    mapView.classList.add('hidden');
+    statsView.classList.add('hidden');
+    gameView.classList.remove('hidden');
+  }
+  function showStats(){
+    stopTimer();
+    loadingView.classList.add('hidden');
+    mapView.classList.add('hidden');
+    gameView.classList.add('hidden');
+    statsView.classList.remove('hidden');
+    renderStats();
+  }
+
+  // ---------- Campaign flow ----------
+  function startStage(i){
+    curStage = i;
+    curBoardIdx = 0;
+    results = Array(BOARDS_PER_STAGE).fill(null);
+    showGame();
+    stageTitleName.textContent = STAGES[i].name;
+    stageTitleDiff.textContent = STAGES[i].diff;
+    startBoard();
+  }
+
+  function renderProgressDots(){
+    progressDotsEl.innerHTML = '';
+    for(let i=0;i<BOARDS_PER_STAGE;i++){
+      const d = document.createElement('div');
+      let cls = 'dot';
+      if(results[i]===true) cls += ' win';
+      else if(results[i]===false) cls += ' loss';
+      else if(i===curBoardIdx) cls += ' current';
+      d.className = cls;
+      d.textContent = results[i]===true ? '✓' : results[i]===false ? '✗' : (i+1);
+      progressDotsEl.appendChild(d);
+    }
+  }
+
+  function startBoard(){
+    const clues = STAGES[curStage].clues;
+    const { puzzle, solution: sol } = generatePuzzle(clues);
+    solution = sol;
+    given = puzzle.map(row=>row.slice());
+    board = puzzle.map(row=>row.slice());
+    notesData = Array.from({length:9}, ()=>Array.from({length:9}, ()=>new Set()));
+    selected = null;
+    mistakes = 0;
+    notesMode = false;
+    history = [];
+    document.getElementById('notesBtn').classList.remove('on');
+    mistakesEl.textContent = '0/'+MAX_MISTAKES;
+    overlayEl.classList.remove('show');
+    renderProgressDots();
+    renderBoard();
+    updateRemaining();
+    startTimer();
+  }
+
+  function updateRemaining(){
+    let left = 0;
+    for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(board[r][c]===0) left++;
+    remainingEl.textContent = left;
+  }
+
+  function cellIndex(r,c){ return r*9+c; }
+
+  function renderBoard(){
+    boardEl.innerHTML = '';
+    for(let r=0;r<9;r++){
+      for(let c=0;c<9;c++){
+        const div = document.createElement('div');
+        div.className = 'cell';
+        if(c===2||c===5) div.classList.add('b-right');
+        if(r===2||r===5) div.classList.add('b-bottom');
+        div.dataset.r = r; div.dataset.c = c;
+        div.addEventListener('click', ()=>selectCell(r,c));
+        boardEl.appendChild(div);
+      }
+    }
+    renderNumpad();
+    refreshCells();
+  }
+
+  function refreshCells(){
+    const cells = boardEl.children;
+    for(let r=0;r<9;r++){
+      for(let c=0;c<9;c++){
+        const div = cells[cellIndex(r,c)];
+        div.classList.remove('selected','peer','same-num','error','given');
+        div.innerHTML = '';
+        const v = board[r][c];
+        const isGiven = given[r][c] !== 0;
+        if(isGiven) div.classList.add('given');
+
+        if(v !== 0){
+          const span = document.createElement('span');
+          span.className = 'val';
+          span.textContent = v;
+          div.appendChild(span);
+          if(!isGiven && v !== solution[r][c]){
+            div.classList.add('error');
+          }
+        } else if(notesData[r][c].size){
+          const wrap = document.createElement('div');
+          wrap.className = 'notes';
+          for(let n=1;n<=9;n++){
+            const s = document.createElement('span');
+            s.textContent = notesData[r][c].has(n) ? n : '';
+            wrap.appendChild(s);
+          }
+          div.appendChild(wrap);
+        }
+      }
+    }
+
+    if(selected){
+      const {r,c} = selected;
+      const selVal = board[r][c];
+      for(let rr=0;rr<9;rr++){
+        for(let cc=0;cc<9;cc++){
+          const div = cells[cellIndex(rr,cc)];
+          const sameBox = Math.floor(rr/3)===Math.floor(r/3) && Math.floor(cc/3)===Math.floor(c/3);
+          if(rr===r && cc===c){
+            div.classList.add('selected');
+          } else if(rr===r || cc===c || sameBox){
+            div.classList.add('peer');
+          }
+          if(selVal !== 0 && board[rr][cc]===selVal && !(rr===r&&cc===c)){
+            div.classList.add('same-num');
+          }
+        }
+      }
+    }
+    updateNumpadCounts();
+  }
+
+  function selectCell(r,c){
+    selected = {r,c};
+    refreshCells();
+  }
+
+  function pushHistory(r,c){
+    history.push({ r, c, val: board[r][c], notes: new Set(notesData[r][c]) });
+    if(history.length > 200) history.shift();
+  }
+
+  function setValue(r,c,v){
+    if(given[r][c] !== 0) return;
+    pushHistory(r,c);
+    board[r][c] = v;
+    notesData[r][c].clear();
+    if(v !== 0 && v !== solution[r][c]){
+      mistakes++;
+      mistakesEl.textContent = mistakes+'/'+MAX_MISTAKES;
+    }
+    updateRemaining();
+    refreshCells();
+    if(mistakes >= MAX_MISTAKES){
+      endBoard(false);
+      return;
+    }
+    checkWin();
+  }
+
+  function toggleNote(r,c,v){
+    if(given[r][c] !== 0 || board[r][c] !== 0) return;
+    pushHistory(r,c);
+    if(notesData[r][c].has(v)) notesData[r][c].delete(v);
+    else notesData[r][c].add(v);
+    refreshCells();
+  }
+
+  function checkWin(){
+    for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+      if(board[r][c] !== solution[r][c]) return;
+    }
+    endBoard(true);
+  }
+
+  function endBoard(won){
+    stopTimer();
+    results[curBoardIdx] = won;
+    renderProgressDots();
+
+    const entry = {
+      ts: Date.now(),
+      stage: curStage,
+      stageName: STAGES[curStage].name,
+      boardIndex: curBoardIdx,
+      won: won,
+      timeSec: timerSec,
+      mistakes: mistakes
+    };
+    playLog.push(entry);
+    recordBoardResult(entry);
+
+    const isLastBoard = curBoardIdx === BOARDS_PER_STAGE - 1;
+
+    overlayDots.classList.add('hidden');
+    overlaySecondary.classList.add('hidden');
+
+    if(won){
+      overlayCard.classList.remove('loss');
+      overlayTag.textContent = 'คลี่คลายแล้ว';
+      overlayTitle.textContent = 'ผ่านกระดาน ' + (curBoardIdx+1) + '!';
+      overlayStats.textContent = 'เวลา ' + fmtTime(timerSec) + ' · พลาด ' + mistakes + ' ครั้ง';
+    } else {
+      overlayCard.classList.add('loss');
+      overlayTag.textContent = 'พลาดครบกำหนด';
+      overlayTitle.textContent = 'ไม่ผ่านกระดาน ' + (curBoardIdx+1);
+      overlayStats.textContent = 'พลาดครบ ' + MAX_MISTAKES + ' ครั้ง';
+    }
+
+    overlayPrimary.textContent = isLastBoard ? 'สรุปผลด่าน' : 'กระดานถัดไป';
+    overlayPrimary.onclick = isLastBoard ? finishStage : ()=>{ curBoardIdx++; startBoard(); };
+    overlayEl.classList.add('show');
+  }
+
+  async function finishStage(){
+    const wins = results.filter(r=>r===true).length;
+    const passed = wins >= PASS_THRESHOLD;
+
+    bestWins[curStage] = bestWins[curStage]===null ? wins : Math.max(bestWins[curStage], wins);
+
+    if(passed){
+      stageStatus[curStage] = 'passed';
+      const next = curStage + 1;
+      if(next < STAGES.length && stageStatus[next] === 'locked'){
+        stageStatus[next] = 'unlocked';
+      }
+    }
+    recordStageAttempt(curStage, wins, passed);
+
+    overlayCard.classList.toggle('loss', !passed);
+    overlayTag.textContent = passed ? 'ด่านสำเร็จ' : 'ด่านยังไม่ผ่าน';
+    overlayTitle.textContent = passed ? STAGES[curStage].name + ' ผ่านแล้ว!' : STAGES[curStage].name + ' ยังไม่ผ่าน';
+    overlayStats.textContent = 'ชนะ ' + wins + ' จาก ' + BOARDS_PER_STAGE + ' กระดาน (ต้องการอย่างน้อย ' + PASS_THRESHOLD + ')';
+
+    overlayDots.classList.remove('hidden');
+    overlayDots.innerHTML = '';
+    results.forEach((r)=>{
+      const s = document.createElement('span');
+      s.className = r ? 'w' : 'l';
+      s.textContent = r ? '✓' : '✗';
+      overlayDots.appendChild(s);
+    });
+
+    const hasNext = passed && (curStage + 1) < STAGES.length;
+    overlayPrimary.textContent = hasNext ? 'ไปด่านถัดไป' : (passed ? 'กลับแผนที่ด่าน' : 'เล่นด่านนี้อีกครั้ง');
+    overlayPrimary.onclick = hasNext ? ()=> startStage(curStage+1) : (passed ? showMap : ()=> startStage(curStage));
+
+    overlaySecondary.classList.remove('hidden');
+    overlaySecondary.textContent = 'กลับแผนที่ด่าน';
+    overlaySecondary.onclick = showMap;
+
+    overlayEl.classList.add('show');
+  }
+
+  function renderNumpad(){
+    numpadEl.innerHTML = '';
+    for(let n=1;n<=9;n++){
+      const btn = document.createElement('button');
+      btn.dataset.n = n;
+      const label = document.createElement('div');
+      label.textContent = n;
+      const cnt = document.createElement('div');
+      cnt.className = 'cnt';
+      btn.appendChild(label);
+      btn.appendChild(cnt);
+      btn.addEventListener('click', ()=>{
+        if(!selected) return;
+        const {r,c} = selected;
+        if(notesMode) toggleNote(r,c,n);
+        else setValue(r,c,n);
+      });
+      numpadEl.appendChild(btn);
+    }
+  }
+
+  function updateNumpadCounts(){
+    const counts = Array(10).fill(0);
+    for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+      if(board[r][c] !== 0 && board[r][c]===solution[r][c]) counts[board[r][c]]++;
+    }
+    const btns = numpadEl.children;
+    for(let n=1;n<=9;n++){
+      const remaining = 9 - counts[n];
+      btns[n-1].querySelector('.cnt').textContent = remaining>0 ? remaining : '';
+      btns[n-1].disabled = remaining<=0;
+    }
+  }
+
+  // ---------- Stats view ----------
+  function renderStats(){
+    const total = playLog.length;
+    const wins = playLog.filter(r=>r.won).length;
+    const winRate = total ? Math.round(wins/total*100) : 0;
+    let furthestIdx = -1;
+    for(let i=0;i<stageStatus.length;i++){ if(stageStatus[i] !== 'locked') furthestIdx = i; }
+
+    const statsCards = document.getElementById('statsCards');
+    statsCards.innerHTML = '';
+    const cardsData = [
+      ['กระดานที่เล่นทั้งหมด', total],
+      ['อัตราชนะ', winRate + '%'],
+      ['ด่านที่ผ่านแล้ว', stageStatus.filter(s=>s==='passed').length + '/' + STAGES.length],
+      ['ไปได้ไกลสุด', furthestIdx>=0 ? STAGES[furthestIdx].name : '—'],
+    ];
+    cardsData.forEach(([label, val])=>{
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = '<div class="n">'+val+'</div><div class="l">'+label+'</div>';
+      statsCards.appendChild(div);
+    });
+
+    // trend: compare first half vs second half chronologically
+    const trendBox = document.getElementById('trendBox');
+    if(total < 6){
+      trendBox.innerHTML = '<div class="empty-note">เล่นอีกสักหน่อยเพื่อให้เห็นแนวโน้มพัฒนาการ (ต้องการข้อมูลอย่างน้อย 6 กระดาน)</div>';
+    } else {
+      const half = Math.floor(total/2);
+      const firstHalf = playLog.slice(0, half);
+      const secondHalf = playLog.slice(half);
+      const rate = (arr)=> arr.length ? arr.filter(r=>r.won).length/arr.length*100 : 0;
+      const avgMistake = (arr)=> arr.length ? arr.reduce((s,r)=>s+r.mistakes,0)/arr.length : 0;
+      const r1 = rate(firstHalf), r2 = rate(secondHalf);
+      const m1 = avgMistake(firstHalf), m2 = avgMistake(secondHalf);
+      const rateDiff = Math.round(r2 - r1);
+      const mistakeDiff = (m2 - m1);
+
+      trendBox.innerHTML = '';
+      const line1 = document.createElement('div');
+      line1.className = 'trend-box';
+      const pill1 = rateDiff > 3 ? '<span class="pill up">ดีขึ้น +'+rateDiff+'%</span>' :
+                    rateDiff < -3 ? '<span class="pill down">แย่ลง '+rateDiff+'%</span>' :
+                    '<span class="pill flat">คงที่</span>';
+      line1.innerHTML = pill1 + '<span>อัตราชนะช่วงหลัง เทียบกับช่วงแรก</span>';
+
+      const line2 = document.createElement('div');
+      line2.className = 'trend-box';
+      line2.style.marginTop = '8px';
+      const pill2 = mistakeDiff < -0.3 ? '<span class="pill up">พลาดน้อยลง</span>' :
+                    mistakeDiff > 0.3 ? '<span class="pill down">พลาดมากขึ้น</span>' :
+                    '<span class="pill flat">คงที่</span>';
+      line2.innerHTML = pill2 + '<span>จำนวนพลาดเฉลี่ยต่อกระดานช่วงหลัง (' + m2.toFixed(1) + ') เทียบช่วงแรก (' + m1.toFixed(1) + ')</span>';
+
+      trendBox.appendChild(line1);
+      trendBox.appendChild(line2);
+    }
+
+    // timeline
+    const timelineBox = document.getElementById('timelineBox');
+    timelineBox.innerHTML = '';
+    if(!total){
+      timelineBox.innerHTML = '<div class="empty-note">ยังไม่มีประวัติการเล่น</div>';
+    } else {
+      const recent = playLog.slice(-40);
+      recent.forEach(r=>{
+        const sq = document.createElement('div');
+        sq.className = 'sq ' + (r.won ? 'win' : 'loss');
+        sq.title = fmtDate(r.ts) + ' · ' + r.stageName + ' กระดาน ' + (r.boardIndex+1) + ' · ' + (r.won?'ชนะ':'แพ้') + ' · ' + fmtTime(r.timeSec);
+        timelineBox.appendChild(sq);
+      });
+    }
+
+    // per-stage table
+    const stageTable = document.getElementById('stageTable');
+    let rowsHtml = '<tr><th>ด่าน</th><th>เล่นไป</th><th>ชนะ</th><th>สถิติดีสุด</th><th>สถานะ</th></tr>';
+    STAGES.forEach((st, i)=>{
+      const entries = playLog.filter(r=>r.stage===i);
+      const attempts = entries.length;
+      const w = entries.filter(r=>r.won).length;
+      const statusText = stageStatus[i]==='passed' ? 'ผ่านแล้ว' : stageStatus[i]==='unlocked' ? 'เล่นได้' : 'ล็อก';
+      const statusClass = stageStatus[i]==='passed' ? 'status-passed' : stageStatus[i]==='locked' ? 'status-locked' : '';
+      rowsHtml += '<tr><td>'+st.name+'</td><td>'+attempts+'</td><td>'+w+'</td><td>'+(bestWins[i]===null?'—':bestWins[i]+'/'+BOARDS_PER_STAGE)+'</td><td class="'+statusClass+'">'+statusText+'</td></tr>';
+    });
+    stageTable.innerHTML = rowsHtml;
+  }
+
+  document.getElementById('loadLbBtn').addEventListener('click', async (e)=>{
+    const btn = e.currentTarget;
+    btn.textContent = 'กำลังโหลด...';
+    btn.disabled = true;
+    const allAttempts = await dbSelect('stage_attempts', null);
+    const lbBox = document.getElementById('lbBox');
+    lbBox.innerHTML = '';
+    if(!allAttempts.length){
+      lbBox.innerHTML = '<div class="empty-note">ยังไม่มีผู้เล่นคนอื่นในอันดับ</div>';
+      return;
+    }
+    const byPlayer = {};
+    allAttempts.forEach(a=>{
+      const cur = byPlayer[a.player_name] || { name: a.player_name, bestStageIndex: -1, passedCount: 0 };
+      if(a.passed){
+        cur.passedCount++;
+        if(a.stage_index > cur.bestStageIndex) cur.bestStageIndex = a.stage_index;
+      }
+      byPlayer[a.player_name] = cur;
+    });
+    const parsed = Object.values(byPlayer)
+      .filter(p=>p.bestStageIndex >= 0)
+      .sort((a,b)=> b.bestStageIndex - a.bestStageIndex || b.passedCount - a.passedCount);
+
+    if(!parsed.length){
+      lbBox.innerHTML = '<div class="empty-note">ยังไม่มีใครผ่านด่านแรกเลย</div>';
+      return;
+    }
+    parsed.forEach((p, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'lb-row' + (p.name===playerName ? ' me' : '');
+      row.innerHTML = '<span>#'+(idx+1)+' <span class="lb-name">'+escapeHtml(p.name)+'</span></span><span>'+escapeHtml(STAGES[p.bestStageIndex].name)+'</span>';
+      lbBox.appendChild(row);
+    });
+  });
+
+  document.getElementById('resetDataBtn').addEventListener('click', ()=>{
+    if(!confirm('เปลี่ยนผู้เล่น? ประวัติการเล่นของ "'+playerName+'" ยังอยู่ในฐานข้อมูลตามเดิม แค่จะให้ตั้งชื่อใหม่ในเครื่องนี้')) return;
+    localStorage.removeItem('sudoku_player_name');
+    playerName = '';
+    stageStatus = STAGES.map((_,i)=> i===0 ? 'unlocked' : 'locked');
+    bestWins = STAGES.map(()=> null);
+    playLog = [];
+    renderPlayerChip();
+    nameInput.value = '';
+    nameModal.classList.add('show');
+  });
+
+  // ---------- Controls ----------
+  document.getElementById('backBtn').addEventListener('click', showMap);
+  document.getElementById('statsBackBtn').addEventListener('click', showMap);
+  document.getElementById('openStatsBtn').addEventListener('click', showStats);
+
+  document.getElementById('notesBtn').addEventListener('click', (e)=>{
+    notesMode = !notesMode;
+    e.currentTarget.classList.toggle('on', notesMode);
+  });
+
+  document.getElementById('undoBtn').addEventListener('click', ()=>{
+    const last = history.pop();
+    if(!last) return;
+    board[last.r][last.c] = last.val;
+    notesData[last.r][last.c] = last.notes;
+    updateRemaining();
+    refreshCells();
+  });
+
+  document.getElementById('hintBtn').addEventListener('click', ()=>{
+    let r,c;
+    if(selected && board[selected.r][selected.c]===0){
+      r = selected.r; c = selected.c;
+    } else {
+      const empties = [];
+      for(let i=0;i<9;i++) for(let j=0;j<9;j++) if(board[i][j]===0) empties.push([i,j]);
+      if(!empties.length) return;
+      [r,c] = empties[Math.floor(Math.random()*empties.length)];
+    }
+    pushHistory(r,c);
+    board[r][c] = solution[r][c];
+    notesData[r][c].clear();
+    selected = {r,c};
+    updateRemaining();
+    refreshCells();
+    const idx = cellIndex(r,c);
+    const div = boardEl.children[idx];
+    div.classList.add('hint-flash');
+    setTimeout(()=>div.classList.remove('hint-flash'), 600);
+    checkWin();
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if(gameView.classList.contains('hidden')) return;
+    if(!selected) return;
+    const {r,c} = selected;
+    if(e.key>='1' && e.key<='9'){
+      const n = parseInt(e.key,10);
+      if(notesMode) toggleNote(r,c,n);
+      else setValue(r,c,n);
+    } else if(e.key==='Backspace' || e.key==='Delete' || e.key==='0'){
+      setValue(r,c,0);
+    } else if(e.key==='ArrowUp'){ moveSel(-1,0); }
+    else if(e.key==='ArrowDown'){ moveSel(1,0); }
+    else if(e.key==='ArrowLeft'){ moveSel(0,-1); }
+    else if(e.key==='ArrowRight'){ moveSel(0,1); }
+  });
+
+  function moveSel(dr,dc){
+    if(!selected) return;
+    let r = Math.min(8, Math.max(0, selected.r+dr));
+    let c = Math.min(8, Math.max(0, selected.c+dc));
+    selectCell(r,c);
+  }
+
+  // ---------- Init ----------
+  document.getElementById('nameSubmit').addEventListener('click', async ()=>{
+    const val = nameInput.value.trim();
+    if(!val) { nameInput.focus(); return; }
+    playerName = val.slice(0, 24);
+    localStorage.setItem('sudoku_player_name', playerName);
+    nameModal.classList.remove('show');
+    renderPlayerChip();
+    showLoading();
+    await loadPlayerDataFromBackend();
+    showMap();
+    helpModal.classList.add('show'); // teach brand-new players the rules right away
+  });
+  nameInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('nameSubmit').click();
+  });
+
+  document.getElementById('helpBtn').addEventListener('click', ()=> helpModal.classList.add('show'));
+  document.getElementById('helpCloseBtn').addEventListener('click', ()=> helpModal.classList.remove('show'));
+  document.getElementById('helpCloseX').addEventListener('click', ()=> helpModal.classList.remove('show'));
+  helpModal.addEventListener('click', (e)=>{ if(e.target === helpModal) helpModal.classList.remove('show'); });
+
+  async function loadPlayerDataFromBackend(){
+    stageStatus = STAGES.map((_,i)=> i===0 ? 'unlocked' : 'locked');
+    bestWins = STAGES.map(()=> null);
+    playLog = [];
+    if(!playerName) return;
+
+    const attempts = await dbSelect('stage_attempts', { player_name: playerName });
+    const derived = deriveProgressFromAttempts(attempts);
+    stageStatus = derived.status;
+    bestWins = derived.best;
+
+    const logs = await dbSelect('board_log', { player_name: playerName });
+    playLog = logs.map(r => ({
+      ts: new Date(r.created_at).getTime(),
+      stage: r.stage_index,
+      stageName: r.stage_name,
+      boardIndex: r.board_index,
+      won: r.won,
+      timeSec: r.time_sec,
+      mistakes: r.mistakes
+    }));
+  }
+
+  async function init(){
+    showLoading();
+
+    if(!backendReady){
+      console.warn('Supabase ยังไม่ได้ตั้งค่า (ใส่ SUPABASE_URL / SUPABASE_ANON_KEY ในโค้ด) — ความคืบหน้าจะไม่ถูกบันทึก');
+    }
+
+    playerName = (localStorage.getItem('sudoku_player_name') || '').slice(0, 24);
+
+    if(!playerName){
+      loadingView.classList.add('hidden');
+      nameModal.classList.add('show');
+      return;
+    }
+
+    await loadPlayerDataFromBackend();
+
+    loadingView.classList.add('hidden');
+    renderPlayerChip();
+    showMap();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
